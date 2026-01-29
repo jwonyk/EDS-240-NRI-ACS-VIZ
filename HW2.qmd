@@ -1,0 +1,174 @@
+---
+title: "Comparing FEMA National Risk Index Scores Across U.S. States"
+subtitle: ""
+author: "Jay Kim"
+date: "January 28, 2026"
+format: html
+editor_options: 
+  chunk_output_type: inline
+---
+
+## Load in Libraries
+
+```{r}
+#| message: false
+#| warning: false
+
+# Load libraries
+library(tidyverse)
+library(here)
+library(janitor)
+library(sf)
+library(ggridges)
+library(ggplot2)
+```
+
+## Data Wrangling
+
+```{r}
+#| message: false
+#| warning: false
+
+# Load FEMA data and transform column names
+fema <- read_csv(
+  here("data",
+       "National_Risk_Index_Counties_807384124455672111.csv")) %>% 
+  clean_names()
+
+# Subset only needed columns (state, county, national risk index score)
+fema_clean <- fema %>% 
+  filter(state_name_abbreviation %in% state.abb) %>% # 50 states only
+  select(state = state_name_abbreviation,
+         county = county_name,
+         nri_score = national_risk_index_score_composite)
+
+# Sanity Check
+sum(is.na(fema_clean$nri_score))
+summary(fema_clean$nri_score)
+```
+
+## Exploratory Visuals
+
+```{r}
+#| message: false
+#| warning: false
+#| fig-width: 15
+#| fig-asp: 0.5
+#| fig-align: center
+
+# Preliminary Plotting
+ggplot(fema_clean, aes(x = reorder(state, nri_score, median),
+                       y = nri_score, fill = state)) +
+  geom_violin(trim = FALSE, color = "grey50", show.legend = FALSE) +
+  scale_fill_manual(values = colorRampPalette(c("#457B9D", "#E63946"))(50)) +
+  labs(x = NULL, 
+       y = "National Risk Index Score (County Level)")
+```
+
+## Exploratory Visuals (California)
+
+```{r}
+#| message: false
+#| warning: false
+#| fig-width: 15
+#| fig-asp: 0.5
+#| fig-align: center
+
+# Focus only California
+ggplot(fema_clean, aes(x = reorder(state, nri_score, median),
+                       y = nri_score, fill = state == "CA")) + # Boolean T/F
+  geom_violin(trim = FALSE, color = "grey50") +
+  scale_fill_manual(values = c("#40E0D0", "#FF1493"),
+                    labels = c("Other States", "California")) +
+  labs(fill = NULL,
+       x = NULL,
+       y = "National Risk Index Score (County Level)") +
+  stat_summary(fun = median,
+               geom = "point",
+               size = 1.2,
+               color = "black")
+```
+
+## Final Visualization
+
+```{r}
+#| message: false
+#| warning: false
+#| fig-cap: "County-level FEMA National Risk Index (NRI) scores by state. States are ordered by median county score, and California is highlighted."
+#| fig-alt: "Figure shows a ridgeline density plot for each US state, comparing the distribution of county-level FEMA National Risk Index scores. States are ordered by median score, and California is highlighted in red while other states are blue. California’s distribution shifted bottom most part of the visualization as the scores are higher relative to other states."
+#| fig-asp: 1.3
+#| fig-align: center
+
+# Reorder states by median score for a better visual
+# Overall trends rather than default alphabetical orders
+state_order <- fema_clean %>%
+  group_by(state) %>%
+  summarize(med = median(nri_score, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(med)) %>%
+  pull(state)
+
+# Focus on California for the ridgeline plot (T/F)
+fema_ridge <- fema_clean %>%
+  mutate(state = factor(state, levels = state_order),
+         is_ca = state == "CA")
+
+# Compute median NRI scores for each state using same factor ordering
+# This will be used for a median points overlaid on the ridgeline plot
+medians <- fema_clean %>% 
+  group_by(state) %>% 
+  summarize(med = median(nri_score, na.rm = TRUE), .groups = "drop") %>% 
+  mutate(state = factor(state, levels = state_order))
+
+# The ridgeline plot highlights overall trend
+# Emphasizes distributional differences with many other groups in one visual
+ggplot(fema_ridge, aes(x = nri_score, y = state, fill = is_ca)) +
+  geom_density_ridges(scale = 2.2, # Vertical heights of ridges
+                      rel_min_height = 0.001, # Trims low-density tails
+                      bandwidth = 6, # Smooth density estimates +/- 6
+                      color = "grey15", alpha = 0.5) +
+  geom_point(data = medians, # Overlay median points
+             aes(x = med, y = state),
+             inherit.aes = FALSE,
+             size = 1.2,
+             color = "black") +
+  scale_fill_manual(values = c("#40E0D0", "#FF1493"), # Custom colors
+                    labels = c("Other States", "California")) +
+  labs(title = "County-level FEMA NRI Scores Across US States",
+       subtitle = "States are ordered by median score",
+       x = "National Risk Index Score (County Level)",
+       y = NULL,
+       caption = "Data: FEMA National Risk Index (2025 Release)",
+       fill = NULL) +
+  theme_minimal(base_size = 12) + # Minimal theme & remove unnecessary grids
+  theme(panel.grid.major.y = element_blank(), # Remove major horizontal grids
+        panel.grid.minor = element_blank(), # Remove all minor grids
+        plot.title = element_text(face = "bold", hjust = 0.5), # Center title
+        plot.subtitle = element_text(hjust = 0.5), # Center subtitle
+        plot.caption = element_text(color = "grey15", margin = margin(t = 10)),
+        legend.position = "top") # Put the legend underneath titles
+```
+
+## Answer Question
+
+1.  What are your variables of interest and what kinds of data (e.g. numeric, categorical, ordered, etc.) are they (a bullet point list is fine)?
+
+    -   National Risk Index (**NRI**) composite score: numeric and continous. This variable represents overall county-level disaster risk
+    -   **State**: categorical and nominal. This variable represents US states
+    -   **County**: categorical and nominal. This variable represents a county that are belong to states
+    -   `is_ca`: binary (T/F). This variable derived from the state variable. Made only for visualization
+
+2.  How did you decide which type of graphic form was best suited for answering the question? What alternative graphic forms could you have used instead? Why did you settle on this particular graphic form?
+
+    -   I selected a ridgeline density plot to compare the distributions of county-level National Risk Index (NRI) scores across states, emphasizing shifts in distributional shape and accommodating many groups. First, I explored using violin boxplots, but they weren't visually pleasing, dense, or easy to interpret due to the sheer number of variables packed together. Using a ridgeline density plot, I was able to order the states by median score, and I have also added median markers, which allows California's position to be situated separately from other states. For an audience, I believe a ridgepline plot would be best for readability and easier understanding.
+
+3.  Summarize your main finding in no more than two sentences.
+
+    -   County-level National Risk Index scores in California are generally higher than those in many other US states. California's higher scores reflect a broad shift across counties rather than a small number of outliers.
+
+4.  What modifications did you make to this visualization to make it more easily readable?
+
+    -   States were ordered by their median county-level risk score to highlight overall trends, and median values were marked to aid interpretation of each distribution. California was highlighted in a different color from the rest of the other states (one color for all other states), used custom colors instead of default palettes, and used both `theme_minimal()` and `theme()` with my own preferences.
+
+5.  Is there anything you wanted to implement, but didn’t know how? If so, please describe.
+
+    -   Some states, such as Arizona and Hawaii, showed fragmented density shapes and were still placed in the wrong order. Even with trimming and bandwidth restrictions, these entries would not be fully corrected without excluding the states or switching to a different plot type. I kept two states to preserve transparency.
