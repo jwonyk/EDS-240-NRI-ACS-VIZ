@@ -40,7 +40,8 @@ fema_clean <- fema %>%
   filter(state_name_abbreviation %in% state.abb) %>% # 50 states only
   select(state = state_name_abbreviation,
          county = county_name,
-         nri_score = national_risk_index_score_composite)
+         nri_score = national_risk_index_score_composite) %>% 
+  mutate(state = str_trim(state))
 
 # Sanity Check
 sum(is.na(fema_clean$nri_score))
@@ -134,7 +135,7 @@ ggplot(fema_ridge, aes(x = nri_score, y = state, fill = is_ca)) +
   scale_fill_manual(values = c("#40E0D0", "#FF1493"), # Custom colors
                     labels = c("Other States", "California")) +
   labs(title = "County-level FEMA NRI Scores Across US States",
-       subtitle = "States are ordered by median score",
+       subtitle = "California counties tend to have higher composite risk scores than many other states",
        x = "National Risk Index Score (County Level)",
        y = NULL,
        caption = "Data: FEMA National Risk Index (2025 Release)",
@@ -143,9 +144,8 @@ ggplot(fema_ridge, aes(x = nri_score, y = state, fill = is_ca)) +
   theme(panel.grid.major.y = element_blank(), # Remove major horizontal grids
         panel.grid.minor = element_blank(), # Remove all minor grids
         plot.title = element_text(face = "bold", hjust = 0.5), # Center title
-        plot.subtitle = element_text(hjust = 0.5), # Center subtitle
         plot.caption = element_text(color = "grey15", margin = margin(t = 10)),
-        legend.position = "top") # Put the legend underneath titles
+        legend.position = "none") # Remove the legend
 ```
 
 ## Answer Question
