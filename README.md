@@ -20,7 +20,7 @@ The final visualization uses a ridgeline density plot to show the distribution o
 
 #### Homework #3: Climate Hazard Exposure by Race and Ethnicity in California
 
-The final visualization answers how climate hazard risk exposure differs across racial and ethnic groups in California. County-level FEMA NRI scores are combined with ACS population estimates, and group exposure is calculated as the population-weighted average risk experienced across counties. Exposure differences are modest statewide, but Asian and Black communities face slightly higher-than-average climate hazard risk exposure compared with the California baseline.
+The final visualization answers how climate hazard risk exposure differs across racial and ethnic groups in California. County-level FEMA NRI scores are combined with ACS population estimates, and group exposure is calculated as the population-weighted average risk experienced across counties. Exposure differences are statewide, but Asian and Black communities face higher-than-average climate hazard risk exposure compared with the California baseline.
 
 <img width="1400" height="865" alt="figure-2" src="https://github.com/user-attachments/assets/bd5212b1-5bcb-442f-845c-5fb7ae6b621e" />
 
