@@ -1,0 +1,202 @@
+---
+title: "Climate Hazard Risk Exposure Across Racial and Ethnic Groups in California"
+author: "Jay Kim"
+date: "February 11, 2026"
+format: html
+editor_options: 
+  chunk_output_type: inline
+---
+
+## Load in Libraries
+
+```{r setup}
+#| message: false
+#| warning: false
+
+# Load libraries
+library(tidyverse)
+library(readr)
+library(here)
+library(janitor)
+library(ggplot2)
+```
+
+## ACS Data Download / Wrangling / Writing 
+
+```{r acs-data-download}
+#| message: false
+#| warning: false
+
+# #....Step 1a: see all available ACS variables + descriptions.....
+# acs_vars <- tidycensus::load_variables(year = 2023,
+#                                        dataset = "acs1")
+# 
+# #..............Step 1b: import race & ethnicity data.............
+# race_ethnicity <- tidycensus::get_acs(
+#   geography = "county",
+#   survey = "acs1",
+#   # NOTE: you may not end up using all these variables
+#   variables = c("B01003_001", "B02001_002", "B02001_003", 
+#                 "B02001_004", "B02001_005", "B02001_006",
+#                 "B02001_007", "B02001_008", "B03002_012",
+#                 "B03002_002"),
+#   state = "CA", 
+#   year = 2023) %>% 
+#   # join variable descriptions (so we know what's what!)
+#   dplyr::left_join(acs_vars, by = dplyr::join_by(variable == name)) 
+# 
+# #.................Step 2: write ACS data to file.................
+# readr::write_csv(race_ethnicity, here::here("data", 
+# "ACS-1yr-2023-county-race-ethnicity.csv"))
+
+#..................Step 3: read in your CSV file.................
+race_ethnicity <- read_csv(here("data",
+                                "ACS-1yr-2023-county-race-ethnicity.csv"))
+```
+
+## Data Wrangling
+
+```{r race-fema-wrangling}
+#| message: false
+#| warning: false
+
+# Load ACS
+race_ethnicity <- read_csv(here("data", 
+                                "ACS-1yr-2023-county-race-ethnicity.csv"))
+
+# Load NRI
+fema <- read_csv(here("data", 
+                      "National_Risk_Index_Counties_807384124455672111.csv")) %>%
+  clean_names()
+
+# NRI CA subset
+ca_fema <- fema %>%
+  filter(state_name_abbreviation == "CA") %>%
+  select(state_county_fips_code,
+         county_name,
+         population_2020,
+         national_risk_index_score_composite)
+
+# ACS wrangling
+# "Hispanic or Latino" is an ethnicity (overlaps race)
+# We need to filter for the specified ethnic groups and calculate proportions
+ca_race <- race_ethnicity %>%
+  filter(variable %in% c(
+    "B02001_002", # White alone
+    "B02001_003", # Black or African American alone
+    "B02001_004", # American Indian and Alaska Native alone
+    "B02001_005", # Asian alone
+    "B02001_006", # Native Hawaiian and Other Pacific Islander alone
+    "B02001_007", # Some other race alone
+    "B02001_008", # Two or more races
+    "B03002_012")) %>% # Hispanic or Latino (of any race)
+  mutate(
+    race_ethnicity = case_when(
+      variable == "B02001_002" ~ "White",
+      variable == "B02001_003" ~ "Black or African American",
+      variable == "B02001_004" ~ "American Indian and Alaska Native",
+      variable == "B02001_005" ~ "Asian",
+      variable == "B02001_006" ~ "Native Hawaiian and Other Pacific Islander",
+      variable == "B02001_007" ~ "Some Other Race",
+      variable == "B02001_008" ~ "Two or More Races",
+      variable == "B03002_012" ~ "Hispanic or Latino",
+      TRUE ~ NA_character_)) %>%
+  select(GEOID, race_ethnicity, estimate)
+
+# Join ACS & NRI
+ca_combined <- ca_race %>%
+  left_join(ca_fema, by = c("GEOID" = "state_county_fips_code")) %>%
+  filter(!is.na(national_risk_index_score_composite), !is.na(population_2020))
+
+# CA baseline NRI
+state_avg <- weighted.mean(
+  ca_fema$national_risk_index_score_composite,
+  w = ca_fema$population_2020,
+  na.rm = TRUE)
+
+# Group exposure
+risk_by_race <- ca_combined %>%
+  group_by(race_ethnicity) %>%
+  summarize(
+    avg_exposure = weighted.mean(national_risk_index_score_composite, 
+                                 w = estimate, na.rm = TRUE),
+    exposure_diff = avg_exposure - state_avg,
+    total_population = sum(estimate, na.rm = TRUE),
+    .groups = "drop") %>%
+  arrange(desc(exposure_diff))
+```
+
+## Data Visualization
+
+```{r climate-hazard}
+#| message: false
+#| warning: false
+#| fig-align: center
+#| fig-cap: "Bars show each group’s difference from the California statewide average FEMA National Risk Index (NRI) climate hazard exposure score. Positive values indicate higher-than-average exposure; negative values indicate lower-than-average exposure."
+#| fig-alt: "Horizontal bar chart showing differences in climate hazard risk exposure across racial and ethnic groups in California. Asian and Black populations have the highest above-average exposure, while White populations are slightly below average. Data are from FEMA National Risk Index and the American Community Survey."
+
+# Custom color palette - using colorblind-friendly colors
+race_colors <- c("White" = "#4477AA",
+                 "Black or African American" = "#EE6677",
+                 "American Indian and Alaska Native" = "#228833",
+                 "Asian" = "#997700",
+                 "Native Hawaiian and Other Pacific Islander" = "#66CCEE",
+                 "Some Other Race" = "#AA3377",
+                 "Two or More Races" = "#BBBBBB",
+                 "Hispanic or Latino" = "#DD5500")
+
+plot_race <- risk_by_race %>%
+  mutate(race_ethnicity = fct_reorder(race_ethnicity, exposure_diff))
+
+ggplot(plot_race, aes(x = race_ethnicity, 
+                    y = exposure_diff, 
+                    fill = race_ethnicity)) +
+  geom_col(width = 0.7) +
+  geom_hline(yintercept = 0, linetype = "solid", 
+             color = "grey80", linewidth = 0.5) +
+  geom_text(aes(label = sprintf("%+.2f", exposure_diff),
+                nudge_y = ifelse(race_ethnicity == "White", 0.006, 0)),
+            hjust = ifelse(plot_race$exposure_diff >= 0, -0.2, 1.2), size = 2.5) +
+  coord_flip() +
+  scale_fill_manual(values = race_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0.1, 0.2))) +
+  labs(
+    title = "Climate Hazard Risk Exposure by Race and Ethnicity in California",
+    subtitle = "Asian and Black Californians show consistently higher exposure to climate hazards",
+    x = NULL,
+    y = NULL,
+    caption = "Data: FEMA National Risk Index '23 & US Census Bureau ACS '23") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.title = element_text(face = "bold", size = 13, hjust = 1.5),
+        plot.subtitle = element_text(size = 10, hjust = 2.5,
+                                     margin = margin(b = 10)),
+        plot.caption = element_text(size = 8, color = "grey20"))
+```
+
+## Answer Question
+
+1.  What are your variables of interest and what kinds of data (e.g. numeric, categorical, ordered, etc.) are they (a bullet point list is fine)?
+
+- Climate hazard exposure difference from the California statewide average FEMA National Risk Index (NRI) score: numeric, continuous. This variable represents how much higher or lower each group’s exposure is compared to the CA state average.
+- Race/ethnicity group: categorical and nominal. This variable represents major racial and ethnic population groups in California (ex. Asian, Black, White, Hispanic or Latino).
+- Exposure direction (above or below average): ordered around a meaningful zero point. This is implied by whether the numeric difference is positive or negative and helps interpret relative risk.
+
+2.  How did you decide which type of graphic form was best suited for answering the question? What alternative graphic forms could you have used instead? Why did you settle on this particular graphic form?
+
+- I selected a horizontal bar chart to compare differences in climate-hazard risk exposure across racial and ethnic groups in California, because this format clearly shows both the magnitude and direction of deviations from the statewide average. I considered using a dot plot or lollipop chart, which could also represent group differences, but the bar chart provides a stronger visual impression of size and makes it easier to distinguish groups above versus below zero. Additionally, using a horizontal layout helped accommodate long race/ethnicity labels, improving readability for an audience.
+
+3.  Summarize your main finding in no more than two sentences.
+
+- Asian and Black Californians show the largest above-average exposure to climate hazard risk compared with the statewide average. White Californians are slightly below the California average, while most other groups are near zero.
+
+4.  What modifications did you make to this visualization to make it more easily readable?
+
+- Race and ethnicity categories were reordered by exposure difference to highlight the ranking of groups from lowest to highest exposure. I used a horizontal orientation (coord_flip()) so that long category labels would fit, added numeric value labels directly on the bars, and adjusted margins and spacing to prevent text from being clipped or overlapping. I removed the y-axis label and gave the explanation in the figure caption (fig-cap).
+
+5.  Is there anything you wanted to implement, but didn’t know how? If so, please describe.
+
+- One challenge was placing text labels consistently for both positive and negative values without overlap, especially for small negative bars such as the White population. I had to find a way to change the font size and the coordinates to place it in the right location.

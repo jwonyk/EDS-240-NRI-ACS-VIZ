@@ -1,6 +1,5 @@
 ---
 title: "Comparing FEMA National Risk Index Scores Across U.S. States"
-subtitle: ""
 author: "Jay Kim"
 date: "January 28, 2026"
 format: html
