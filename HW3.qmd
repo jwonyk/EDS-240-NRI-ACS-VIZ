@@ -133,7 +133,7 @@ risk_by_race <- ca_combined %>%
 #| warning: false
 #| fig-align: center
 #| fig-cap: "Bars show each group’s difference from the California statewide average FEMA National Risk Index (NRI) climate hazard exposure score. Positive values indicate higher-than-average exposure; negative values indicate lower-than-average exposure."
-#| fig-alt: "Horizontal bar chart showing differences in climate hazard risk exposure across racial and ethnic groups in California. Asian and Black populations have the highest above-average exposure, while White populations are slightly below average. Data are from FEMA National Risk Index and the American Community Survey."
+#| fig-alt: "Horizontal bar chart showing differences in climate hazard risk exposure across racial and ethnic groups in California. Asian and Black populations have the highest above-average exposure, while White populations are below average. Data are from FEMA National Risk Index and the American Community Survey."
 
 # Custom color palette - using colorblind-friendly colors
 race_colors <- c("White" = "#4477AA",
@@ -191,7 +191,7 @@ ggplot(plot_race, aes(x = race_ethnicity,
 
 3.  Summarize your main finding in no more than two sentences.
 
-- Asian and Black Californians show the largest above-average exposure to climate hazard risk compared with the statewide average. White Californians are slightly below the California average, while most other groups are near zero.
+- Asian and Black Californians show the largest above-average exposure to climate hazard risk compared with the statewide average. White Californians are below the California average.
 
 4.  What modifications did you make to this visualization to make it more easily readable?
 
