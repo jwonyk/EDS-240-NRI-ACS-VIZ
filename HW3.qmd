@@ -1,7 +1,7 @@
 ---
 title: "Climate Hazard Risk Exposure Across Racial and Ethnic Groups in California"
 author: "Jay Kim"
-date: "February 11, 2026"
+date: "February 20, 2026"
 format: html
 editor_options: 
   chunk_output_type: inline
@@ -135,30 +135,22 @@ risk_by_race <- ca_combined %>%
 #| fig-cap: "Bars show each group’s difference from the California statewide average FEMA National Risk Index (NRI) climate hazard exposure score. Positive values indicate higher-than-average exposure; negative values indicate lower-than-average exposure."
 #| fig-alt: "Horizontal bar chart showing differences in climate hazard risk exposure across racial and ethnic groups in California. Asian and Black populations have the highest above-average exposure, while White populations are below average. Data are from FEMA National Risk Index and the American Community Survey."
 
-# Custom color palette - using colorblind-friendly colors
-race_colors <- c("White" = "#4477AA",
-                 "Black or African American" = "#EE6677",
-                 "American Indian and Alaska Native" = "#228833",
-                 "Asian" = "#997700",
-                 "Native Hawaiian and Other Pacific Islander" = "#66CCEE",
-                 "Some Other Race" = "#AA3377",
-                 "Two or More Races" = "#BBBBBB",
-                 "Hispanic or Latino" = "#DD5500")
-
 plot_race <- risk_by_race %>%
   mutate(race_ethnicity = fct_reorder(race_ethnicity, exposure_diff))
 
 ggplot(plot_race, aes(x = race_ethnicity, 
-                    y = exposure_diff, 
-                    fill = race_ethnicity)) +
+                      y = exposure_diff,
+                      fill = exposure_diff > 0)) +
   geom_col(width = 0.7) +
+  scale_fill_manual(values = c("TRUE" = "#66CCEE",
+                               "FALSE" = "grey40"),
+                    guide = "none") +
   geom_hline(yintercept = 0, linetype = "solid", 
              color = "grey80", linewidth = 0.5) +
   geom_text(aes(label = sprintf("%+.2f", exposure_diff),
                 nudge_y = ifelse(race_ethnicity == "White", 0.006, 0)),
             hjust = ifelse(plot_race$exposure_diff >= 0, -0.2, 1.2), size = 2.5) +
   coord_flip() +
-  scale_fill_manual(values = race_colors) +
   scale_y_continuous(expand = expansion(mult = c(0.1, 0.2))) +
   labs(
     title = "Climate Hazard Risk Exposure by Race and Ethnicity in California",
